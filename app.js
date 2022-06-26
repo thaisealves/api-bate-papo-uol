@@ -20,8 +20,7 @@ mongoClient.connect(() => {
 const participantSchema = joi.object({
   name: joi.string().required(),
   lastStatus: joi.number(),
-});
-
+}); //joi validation to participant
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
   const participant = {
@@ -66,4 +65,40 @@ app.get("/participants", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+app.post("/messages", async (req, res) => {
+  const participants = await db.collection("participants").find().toArray(); // to take the participants informations from the db
+  const participantsNames = participants.map((value) => value.name); // to get all the participants names to use on the schema
+
+  const messageSchema = joi.object({
+    to: joi.string().required(),
+    text: joi.string().required(),
+    type: joi.string().valid("message", "private_message"),
+    from: joi.string().valid(...participantsNames),
+  }); // joi validation to the message
+
+  const from = req.headers.user; // getting user from headers
+  const sendMessage = {
+    from,
+    ...req.body,
+  };
+  const isValid = messageSchema.validate(sendMessage); //using the schema to validate
+  if (isValid.error) {
+    res.sendStatus(422);
+    return;
+  }
+
+  try {
+    await db
+      .collection("messages")
+      .insertOne({ ...sendMessage, time: now.format("hh:mm:ss") });
+
+    res.sendStatus(201);
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
+});
+
+
 app.listen(5000);
