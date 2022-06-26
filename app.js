@@ -119,4 +119,21 @@ app.get("/messages", async (req, res) => {
   }
 });
 
+app.post("/status", async (req, res) => {
+  const { user } = req.headers;
+  const participants = await db.collection("participants").find().toArray(); // to take the participants informations from the db
+  const participantsNames = participants.map((value) => value.name); // to get all the participants names to use on the schema
+  if (!participantsNames.includes(user)) {
+    res.sendStatus(404);
+    return;
+  } else {
+    await db.collection("participants").updateOne(
+      {
+        name: user,
+      },
+      { $set: { lastStatus: Date.now() } }
+    );
+    res.sendStatus(200);
+  }
+});
 app.listen(5000);
