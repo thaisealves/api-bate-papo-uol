@@ -100,5 +100,23 @@ app.post("/messages", async (req, res) => {
   }
 });
 
+app.get("/messages", async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const { user } = req.headers;
+  const messages = await db.collection("messages").find().toArray();
+  const messagesUser = messages.filter(
+    (value) => value.to === "Todos" || value.to === user || value.from === user
+  ); //filtering if the user has to see the message
+  try {
+    if (!limit) {
+      res.send(messagesUser);
+    } else {
+      res.send(messagesUser.slice(-limit));
+    }
+  } catch (error) {
+    console.log(error);
+    res.sendStatus(500);
+  }
+});
 
 app.listen(5000);
