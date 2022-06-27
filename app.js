@@ -136,4 +136,28 @@ app.post("/status", async (req, res) => {
     res.sendStatus(200);
   }
 });
+async function removing() {
+  const participants = await db.collection("participants").find().toArray(); // to take the participants informations from the db
+  const participantsStatus = participants.map((value) => value.lastStatus); // to get all the participants names to use on the schema
+  for (let i = 0; i < participantsStatus.length; i++) {
+    if (Date.now() - participantsStatus[i] > 10000) {
+      const removed = await db
+        .collection("participants")
+        .findOne({ lastStatus: participantsStatus[i] });
+      console.log(removed.name);
+      const removedMessage = {
+        from: removed.name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: now.format("hh:mm:ss"),
+      };
+      await db.collection("participants").deleteOne({
+          lastStatus: participantsStatus[i],
+        });
+      await db.collection("messages").insertOne(removedMessage);
+    }
+  }
+}
+setInterval(removing, 15000);
 app.listen(5000);
