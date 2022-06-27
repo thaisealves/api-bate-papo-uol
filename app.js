@@ -154,7 +154,63 @@ app.delete("/messages/:idMessages", async (req, res) => {
     res.sendStatus(401);
   } else {
     try {
-      await db.collection("messages").deleteOne({ _id: new ObjectId(idMessages) });
+      await db
+        .collection("messages")
+        .deleteOne({ _id: new ObjectId(idMessages) });
+      res.sendStatus(204);
+    } catch (error) {
+      console.log(error);
+      res.sendStatus(500);
+    }
+  }
+});
+
+app.put("/messages/:idMessages", async (req, res) => {
+  const now = dayjs();
+  const participants = await db.collection("participants").find().toArray(); // to take the participants informations from the db
+  const participantsNames = participants.map((value) => value.name); // to get all the participants names to use on the schema
+  const { idMessages } = req.params;
+
+  const messageSchema = joi.object({
+    to: joi.string().required(),
+    text: joi.string().required(),
+    type: joi.string().valid("message", "private_message"),
+    from: joi.string().valid(...participantsNames),
+  }); // joi validation to the message
+
+  const from = req.headers.user; // getting user from headers
+  const updateMessage = {
+    from,
+    ...req.body,
+  };
+  const isValid = messageSchema.validate(updateMessage); //using the schema to validate
+  if (isValid.error) {
+    res.sendStatus(422);
+    return;
+  }
+  const messageFromId = await db
+    .collection("messages")
+    .findOne({ _id: new ObjectId(idMessages) });
+
+  if (!messageFromId) {
+    res.sendStatus(404);
+    return;
+  } else if (messageFromId.from !== from) {
+    res.sendStatus(401);
+  } else {
+    try {
+      await db.collection("messages").updateOne(
+        {
+          _id: new ObjectId(idMessages),
+        },
+        {
+          $set: {
+            ...updateMessage,
+            time: now.format("hh:mm:ss"),
+          },
+        }
+      );
+
       res.sendStatus(200);
     } catch (error) {
       console.log(error);
