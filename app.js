@@ -2,10 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import joi from "joi";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dayjs from "dayjs";
 dotenv.config();
-const now = dayjs();
 const app = express();
 
 app.use(cors());
@@ -21,8 +20,11 @@ const participantSchema = joi.object({
   name: joi.string().required(),
   lastStatus: joi.number(),
 }); //joi validation to participant
+
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
+  const now = dayjs();
+
   const participant = {
     name,
     lastStatus: Date.now(),
@@ -67,6 +69,7 @@ app.get("/participants", async (req, res) => {
 });
 
 app.post("/messages", async (req, res) => {
+  const now = dayjs();
   const participants = await db.collection("participants").find().toArray(); // to take the participants informations from the db
   const participantsNames = participants.map((value) => value.name); // to get all the participants names to use on the schema
 
@@ -136,7 +139,33 @@ app.post("/status", async (req, res) => {
     res.sendStatus(200);
   }
 });
+
+app.delete("/messages/:idMessages", async (req, res) => {
+  const { idMessages } = req.params;
+  const { user } = req.headers;
+  const messageFromId = await db
+    .collection("messages")
+    .findOne({ _id: new ObjectId(idMessages) });
+
+  if (!messageFromId) {
+    res.sendStatus(404);
+    return;
+  } else if (messageFromId.from !== user) {
+    res.sendStatus(401);
+  } else {
+    try {
+      await db.collection("messages").deleteOne({ _id: new ObjectId(idMessages) });
+      res.sendStatus(200);
+    } catch (error) {
+      console.log(error);
+      res.sendStatus(500);
+    }
+  }
+});
+
 async function removing() {
+  const now = dayjs();
+
   const participants = await db.collection("participants").find().toArray(); // to take the participants informations from the db
   const participantsStatus = participants.map((value) => value.lastStatus); // to get all the participants names to use on the schema
   for (let i = 0; i < participantsStatus.length; i++) {
@@ -144,7 +173,6 @@ async function removing() {
       const removed = await db
         .collection("participants")
         .findOne({ lastStatus: participantsStatus[i] });
-      console.log(removed.name);
       const removedMessage = {
         from: removed.name,
         to: "Todos",
@@ -153,11 +181,12 @@ async function removing() {
         time: now.format("hh:mm:ss"),
       };
       await db.collection("participants").deleteOne({
-          lastStatus: participantsStatus[i],
-        });
+        lastStatus: participantsStatus[i],
+      });
       await db.collection("messages").insertOne(removedMessage);
     }
   }
 }
 setInterval(removing, 15000);
+
 app.listen(5000);
